@@ -72,14 +72,14 @@ def set_cols(val):
     if (val&0x20 == 0x20): IO.output(col_pins[5], 0)
     else: IO.output(col_pins[5], 1)
 
-def show(list_of_vals, cycles=100, t_on=0.0005, t_off=0):
+def show(list_of_vals, cycles=5, t_on=0.0005, t_off=0):
     for i in xrange(cycles):
         for y in xrange(len(list_of_vals)):
             set_cols(list_of_vals[y])
             set_row(row_select[y])
-            socketio.sleep(t_on)
+            time.sleep(t_on)
             reset_rows()
-            socketio.sleep(t_off)
+            time.sleep(t_off)
 
 def show_pulse(list_of_vals):
     for j in range(20)+range(19,-1,-1):
@@ -103,11 +103,16 @@ main_data = arr.reshape((n,m))
 
 def data_logger(main_data):
     while True:
-        show(main_data[0,:])
+        # print main_data[1,0], main_data[1,1]
+        # socketio.sleep(1)
+        # show_pulse(main_data[0,:])
+        show(main_data[0,:], t_on=main_data[1,0], t_off=main_data[1,1])
     
 def background_thread():
     global main_data
     count = 0
+    main_data[1,0] = 0.002
+    main_data[1,1] = 0.000
     while True:
         # show(main_data)
         socketio.sleep(10)
@@ -122,10 +127,13 @@ def index():
 def test_message(message):
     global main_data
     # print message['data']
-    main_data[0,:] = message['data']
-    for i in xrange(main_data.shape[0]):
+    if len(message['data']) == 10:
+        main_data[0,:] = message['data']
         for j in xrange(main_data.shape[1]):
-            main_data[i,j] = reverseBits(main_data[i,j])
+            main_data[0,j] = reverseBits(main_data[0,j])
+    else: 
+        main_data[1,0] = 0.002 - int(message['data'][0])*0.0001
+        main_data[1,1] = int(message['data'][0])*0.0001
 
     session['receive_count'] = session.get('receive_count', 0) + 1
 	# emit('my_response',{'data': message['data'], 'count': session['receive_count']})
@@ -147,14 +155,6 @@ def get_ip_address(ifname):
 
 if __name__ == '__main__':
     local_ip = get_ip_address('wlan0')
-    '''
-    for n in xrange(3):
-        for i in xrange(len(local_ip)):
-            try: show(numbers[int(local_ip[i])], cycles=30)
-            except: show(dot, cycles=23)
-        reset_rows()
-        socketio.sleep(0.7)
-    '''
     process0 = Process( target=data_logger, args=(main_data,) )
     process0.start()
     # process0.join()
